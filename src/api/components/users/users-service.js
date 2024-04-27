@@ -5,20 +5,63 @@ const { hashPassword, passwordMatched } = require('../../../utils/password');
  * Get list of users
  * @returns {Array}
  */
-async function getUsers() {
-  const users = await usersRepository.getUsers();
+async function getUsers({ page_number = 1, page_size = 10, sort, search } = {}) {
+  const parsedSort = sort || { email: 'asc' };
+  const parsedSearch = search || {};
 
-  const results = [];
-  for (let i = 0; i < users.length; i += 1) {
-    const user = users[i];
-    results.push({
-      id: user.id,
-      name: user.name,
-      email: user.email,
-    });
+  // Validate the sort and search fields
+  const allowedFields = ['email', 'name'];
+  for (const [field, order] of Object.entries(parsedSort)) {
+    if (!allowedFields.includes(field)) {
+      throw new Error(`Invalid sort field: ${field}`);
+    }
+  }
+  for (const [field, value] of Object.entries(parsedSearch)) {
+    if (!allowedFields.includes(field)) {
+      throw new Error(`Invalid search field: ${field}`);
+    }
   }
 
-  return results;
+  // Build the query and sort objects for the repository
+  const query = {};
+  if (parsedSearch.email) {
+    query.email = { $regex: parsedSearch.email, $options: 'i' };
+  }
+  if (parsedSearch.name) {
+    query.name = { $regex: parsedSearch.name, $options: 'i' };
+  }
+  const sortObj = {};
+  for (const [field, order] of Object.entries(parsedSort)) {
+    sortObj[field] = order;
+  }
+
+  // Get the users from the repository
+  const users = await usersRepository.getUsers({ query, sort: sortObj });
+
+  // Count the number of users that match the query
+  const totalUsers = await usersRepository.countUsers(query);
+
+  // Calculate pagination information
+  const totalPages = Math.ceil(totalUsers / page_size);
+  const hasPreviousPage = page_number > 1;const hasNextPage = page_number < totalPages;
+
+  // Map the user documents to a simpler response object
+  const results = users.map((user) => ({
+    id: user.id,
+    name: user.name,
+    email: user.email,
+  }));
+
+  // Return the response object
+  return {
+    page_number,
+    page_size,
+    count: results.length,
+    total_pages: totalPages,
+    has_previous_page: hasPreviousPage,
+    has_next_page: hasNextPage,
+    data: results,
+  };
 }
 
 /**

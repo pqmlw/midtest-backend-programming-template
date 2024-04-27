@@ -10,7 +10,53 @@ const { errorResponder, errorTypes } = require('../../../core/errors');
  */
 async function getUsers(request, response, next) {
   try {
-    const users = await usersService.getUsers();
+    const { page_number = 1, page_size = 10, sort, search } = request.query;
+
+    // Validate the sort and search fields
+    const allowedFields = ['email', 'name'];
+    if (sort && typeof sort === 'string') {
+      const sortFields = sort.split(',');
+      for (const field of sortFields) {
+        const [fieldName, order] = field.split(':');
+        if (!allowedFields.includes(fieldName)) {
+          throw new Error(`Invalid sort field: ${fieldName}`);
+        }
+      }
+    }
+    if (search && typeof search === 'string') {
+      const searchFields = search.split(',');
+      for (const field of searchFields) {
+        const [fieldName, value] = field.split(':');
+        if (!allowedFields.includes(fieldName)) {
+          throw new Error(`Invalid search field: ${fieldName}`);
+        }
+      }
+    }
+
+    // Build the query and sort objects for the repository
+    const query = {};
+    if (search) {
+      search.split(',').forEach((field) => {
+        const [fieldName, value] = field.split(':');
+        query[fieldName] = value;
+      });
+    }
+    const sortObj = {};
+    if (sort) {
+      sort.split(',').forEach((field) => {
+        const [fieldName, order] = field.split(':');
+        sortObj[fieldName] = order;
+      });
+    }
+
+    // Get the users from the repository
+    const users = await usersService.getUsers({
+      page_number: parseInt(page_number),
+      page_size: parseInt(page_size),
+      sort: sortObj,
+      search: query,
+    });
+
     return response.status(200).json(users);
   } catch (error) {
     return next(error);

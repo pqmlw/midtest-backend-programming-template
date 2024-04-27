@@ -1,11 +1,17 @@
 const { User } = require('../../../models');
 
 /**
- * Get a list of users
+ * Get a list of users with pagination and filtering
+ * @param {object} query - MongoDB query object
+ * @param {object} sort - MongoDB sort object
  * @returns {Promise}
  */
-async function getUsers() {
-  return User.find({});
+async function getUsers({ query = {}, sort = {} } = {}) {
+  return User.find(query).sort(sort);
+}
+
+async function countUsers(query = {}) {
+  return User.countDocuments(query);
 }
 
 /**
@@ -89,4 +95,5 @@ module.exports = {
   deleteUser,
   getUserByEmail,
   changePassword,
+  countUsers,
 };
